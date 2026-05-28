@@ -72,44 +72,34 @@ def call_openai(
     """
     # TODO: Import OpenAI, instantiate client, call chat.completions.create with parameters,
     #       measure execution start/end time, extract text and token usage, and return them.
+    from openai import OpenAI
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+   
+    start = time.time()
 
-    client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY")
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
     )
 
-    def call_openai(
-        prompt: str,
-        model: str = OPENAI_MODEL,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
-        max_tokens: int = 256,
-    ) -> tuple[str, float, dict]:
+    latency = time.time() - start
 
-        start = time.time()
+    response_text = response.choices[0].message.content or ""
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-        )
+    usage_stats = {
+        "input_tokens": response.usage.prompt_tokens,
+        "output_tokens": response.usage.completion_tokens,
+    }
 
-        latency = time.time() - start
-
-        response_text = response.choices[0].message.content or ""
-
-        usage_stats = {
-            "input_tokens": response.usage.prompt_tokens,
-            "output_tokens": response.usage.completion_tokens,
-        }
-
-        return response_text, latency, usage_stats
+    return response_text, latency, usage_stats
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +459,11 @@ def format_comparison_table(results: list[dict]) -> str:
         clean_prompt = raw_prompt.replace("\n", " ").replace("\r", "")
         trunc_prompt = clean_prompt[:47] + "..." if len(clean_prompt) > 50 else clean_prompt
 
+        model_mapping = {
+            "gpt4o": "GPT-4o",
+            "gpt4o_mini": "GPT-4o-Mini",
+            "gemini_flash": "Gemini-Flash"
+        }
         for model_key in ["gpt4o", "gpt4o_mini", "gemini_flash"]:
             if model_key not in res:
                 continue
@@ -483,7 +478,8 @@ def format_comparison_table(results: list[dict]) -> str:
             tokens = f"{stats.get('input_tokens', 0)}/{stats.get('output_tokens', 0)}"
             cost = f"${stats.get('cost', 0):.6f}"
 
-            lines.append(f"| {trunc_prompt} | {model_key} | {trunc_resp} | {latency} | {tokens} | {cost} |")
+            display_name = model_mapping.get(model_key, model_key)
+            lines.append(f"| {trunc_prompt} | {display_name} | {trunc_resp} | {latency} | {tokens} | {cost} |")
 
     return "\n".join(lines)
 
