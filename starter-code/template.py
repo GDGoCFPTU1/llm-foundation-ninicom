@@ -72,30 +72,42 @@ def call_openai(
     """
     # TODO: Import OpenAI, instantiate client, call chat.completions.create with parameters,
     #       measure execution start/end time, extract text and token usage, and return them.
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "dummy_key"))
+    OPENAI_MODEL = "gpt-4o-mini"
+
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+def call_openai(
+    prompt: str,
+    model: str = OPENAI_MODEL,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    max_tokens: int = 256,
+) -> tuple[str, float, dict]:
 
     start = time.time()
+
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
         temperature=temperature,
         top_p=top_p,
         max_tokens=max_tokens,
     )
+
     latency = time.time() - start
 
     response_text = response.choices[0].message.content or ""
 
-    try:
-        input_tokens = response.usage.prompt_tokens
-        output_tokens = response.usage.completion_tokens
-    except AttributeError:
-        input_tokens = response.usage.get('prompt_tokens', 0)
-        output_tokens = response.usage.get('completion_tokens', 0)
-
     usage_stats = {
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens
+        "input_tokens": response.usage.prompt_tokens,
+        "output_tokens": response.usage.completion_tokens,
     }
 
     return response_text, latency, usage_stats
